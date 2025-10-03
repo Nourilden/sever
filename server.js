@@ -1,16 +1,15 @@
-require("dotenv").config();
-const express = require("express");
-const cors = require("cors");
+// api/fix.js
+export default async function handler(req, res) {
+  // ✅ Enable CORS
+  res.setHeader("Access-Control-Allow-Origin", "*");
+  res.setHeader("Access-Control-Allow-Methods", "GET,POST,OPTIONS");
+  res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");
 
-const app = express();
-app.use(cors());
-app.use(express.json());
+  if (req.method === "OPTIONS") {
+    return res.status(200).end(); // Preflight response
+  }
 
-app.post("/api/fix", async (req, res) => {
   try {
-    console.log("API Key:", process.env.OPENROUTER_API_KEY ? "Present" : "Missing");
-    console.log("Request body:", JSON.stringify(req.body, null, 2));
-
     const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
       method: "POST",
       headers: {
@@ -20,46 +19,9 @@ app.post("/api/fix", async (req, res) => {
       body: JSON.stringify(req.body),
     });
 
-    console.log("API Response status:", response.status);
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.log("API Error:", errorText);
-      return res.status(response.status).json({ error: "API Error", details: errorText });
-    }
-
-    // stream response back (إذا الـ API بيرجع Stream)
-    res.setHeader("Content-Type", "text/plain");
-    res.setHeader("Cache-Control", "no-cache");
-    res.setHeader("Connection", "keep-alive");
-
-    const reader = response.body.getReader();
-    const decoder = new TextDecoder();
-
-    try {
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) {
-          res.end();
-          break;
-        }
-        const chunk = decoder.decode(value, { stream: true });
-        res.write(chunk);
-      }
-    } catch (streamError) {
-      console.error("Streaming error:", streamError);
-      res.end();
-    }
+    const data = await response.json();
+    res.status(200).json(data);
   } catch (err) {
-    console.error("Server error:", err);
-    res.status(500).json({ error: "Server error", details: err.message });
+    res.status(500).json({ error: err.message });
   }
-});
-
-app.get("/", (req, res) => {
-  res.send("Fixly API server is running.");
-});
-
-const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`);
-});
+}
